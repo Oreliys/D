@@ -1,0 +1,92 @@
+#####хостовая операционная система
+lsblk
+fdisk -l
+mkdir /mnt/img_to_analyze
+mount /dev/sdc1 /mnt/img_to_analyze
+#Узнаём часовой пояс хостовой ОС и время
+cat /etc/timezone
+date
+#Узнаём часовой пояс хостовой ОС и время на образе для анализа
+cat /mnt/img_to_analyze/etc/timezone
+#Устанавливаем тот же часовой пояс на хостовой машине
+timedatectl list-timezones
+timedatectl set-timezone America/New_York
+date
+
+#####Система в образе для анализа - корневой раздел
+cd /mnt/img_to_analyze/
+#Важно! первый слеш не ставим!
+
+#Определяем - сервер у нас или пользовательский комп
+cat etc/hostname
+ls -la home
+cd etc/init.d/ && mc   #(показать  vsftpd)
+cd etc/systemd/system && mc #(показать nginx, vsftpd, node-server)
+cd var/log/ && mc
+
+#Получаем доступ - генерим md5-Хеш для пароля "123"
+openssl passwd -1 123
+#Проверяем дату изменения файла, который собираемся редактировать ДО его редактирования. Опционально - бекапим.
+stat etc/passwd
+nano etc/passwd
+
+#Всё! Можно грузить, однако /tmp
+
+#Продолжаем статически получать информацию
+ls -la - #посмотреть символьные ссылки на ядро  (boot/vmlinuz-4.19.0-22-amd64)
+
+
+cat etc/network/interfaces #Адрес настроен статически - 10.22.12.37
+
+
+var/lib/dhcp/dhclient.ens32.leases #Узнали домен "gubkin.ru" и адрес dhcp-сервера 10.22.12.1
+
+
+ls -lat tmp
+ls -lat var/log
+stat var/log/auth.log #Узнали дату последней авторизации по изменению лога 2022-11-09 04:17:01
+#Cheat-code
+less root/.bash_history
+less root/.viminfo  #Сделать ликбез по  Unix Timestamp
+date -d @1738509695
+less etc/crontab
+less etc/cron.d/.placeholder
+less var/log/auth.log
+
+
+stat etc/nginx/conf.d/node.conf
+cat etc/nginx/conf.d/node.conf
+stat etc/vsftpd.conf
+cat etc/vsftpd.conf
+stat etc/systemd/system/node-server.service
+cat etc/systemd/system/node-server.service
+
+less var/log/nginx/access.log.1
+less var/log/auth.log  ##Узнали дату авторизации с ip атакующего и получили сразу два IOC (ip и RSA-ключ)Nov  7 13:49:43 prod-server sshd[5143]: Accepted publickey for root from 10.22.12.242 port 47250 ssh2: RSA SHA256:QQ5jF3iNZ4l9FGu4SFjIP5ELPT9DVTmec7WPb/RDUT4
+
+less var/log/syslog (пусто)
+less var/log/syslog (пусто)
+zcat var/log/syslog.2.gz | less  ##Сервер сходит с ума: Nov  7 13:35:06 prod-server node[433]: 1     чуть ниже - запуск crontab от www-data, это RCE, вносим в таблицу: Nov  7 13:42:26 prod-server crontab[2635]: (www-data) LIST (www-data)
+Ещё ниже - Nov  7 13:49:43 prod-server systemd[1]: Started Session 6 of user root.
+
+#По найденному IOC пробуем полнотекстовый поиск в каталогах при помощи grep -ir:
+grep -ir  10.22.12.242 tmp/
+#По найденному IOC, используя его как timestamp ищем файлы, которые были изменены позже:
+find ./ -type f -cnewer tmp/log.txt
+##############################################################
+##############################################################
+sqlite3 .config/chromium/Default/History
+.tables
+SELECT * FROM downloads;
+SELECT * FROM urls;
+sqlite3 .mozilla/firefox/psvd2vxp.default-release/places.sqlite
+.tables
+SELECT * FROM moz_annos;
+SELECT * FROM moz_places;
+
+
+
+##############################################################
+
+
+
